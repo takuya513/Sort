@@ -17,12 +17,12 @@ public class QuickMergeSort_2<E extends Comparable> extends QuickSort<E> {
 	ExecutorService executor;
 	int threadsNum, arrayLength, sectionOfSort, pivotOfEnd, pos, pos2;
 	int pivotOfRest = -1; //マージするときに余った部分の仕切り
-	final List<Callable<Object>> workers;
+	final ArrayList<Callable<Object>> workers;
 
 	public QuickMergeSort_2(){
 		threadsNum = Runtime.getRuntime().availableProcessors();
 		//threadsNum =2;
-		executor = Executors.newCachedThreadPool();
+		executor = Executors.newFixedThreadPool(threadsNum);
 		workers = new ArrayList<Callable<Object>>(threadsNum);
 
 	}
@@ -115,6 +115,22 @@ public class QuickMergeSort_2<E extends Comparable> extends QuickSort<E> {
 		return false;
 	}
 
+	public  void merge(int left,int mid,int right,LinkedList<E> buff){
+		int i = left,j = mid + 1;
+
+		while(i <= mid && j <= right) {
+			if(array[i].compareTo(array[j]) < 0){
+				buff.add(array[i]); i++;
+			}else{
+				buff.add(array[j]); j++;
+			}
+		}
+
+		while(i <= mid) { buff.add(array[i]); i++;}
+		while(j <= right) { buff.add(array[j]); j++;}
+		for(i = left;i <= right; i++){ array[i] = buff.remove(0);}
+	}
+
 
 	class MergeSortWorker implements Runnable{
 		int left,right,mid;
@@ -137,22 +153,6 @@ public class QuickMergeSort_2<E extends Comparable> extends QuickSort<E> {
 		}
 	}
 
-	public  void merge(int left,int mid,int right,LinkedList<E> buff){
-		int i = left,j = mid + 1;
-
-		while(i <= mid && j <= right) {
-			if(array[i].compareTo(array[j]) < 0){
-				buff.add(array[i]); i++;
-			}else{
-				buff.add(array[j]); j++;
-			}
-		}
-
-		while(i <= mid) { buff.add(array[i]); i++;}
-		while(j <= right) { buff.add(array[j]); j++;}
-		for(i = left;i <= right; i++){ array[i] = buff.remove(0);}
-	}
-
 	class QuickSortWorker implements Runnable {
 		int left,right;
 		public QuickSortWorker(int left,int right){
@@ -164,6 +164,9 @@ public class QuickMergeSort_2<E extends Comparable> extends QuickSort<E> {
 			quickSort(left,right);
 		}
 	}
+
+
+
 
 	//	public  void quickSort(int left,int right){
 	//		super.quickSort(left, right);
