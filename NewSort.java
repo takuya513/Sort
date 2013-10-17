@@ -1,111 +1,122 @@
 package sort;
 
+import java.io.*;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.*;
 
 import quickSort.QuickSort;
-import sort.QuickMergeSort_2.QuickSortWorker;
+import tools.MyArrayUtil;
 
 public class NewSort <E extends Comparable> extends QuickSort<E>{
 	ExecutorService executor;
 	int threadsNum,arrayLength,pos;
 	final List<Callable<Object>> workers;
 	final LinkedList<MergeInfo> works;
-	boolean tmp = false;
+	boolean endArray = false;
+
 
 	public NewSort() {
 		threadsNum = Runtime.getRuntime().availableProcessors();
 		executor = Executors.newCachedThreadPool();
 		workers = new ArrayList<Callable<Object>>(threadsNum);
 		works = new LinkedList<MergeInfo>();
+		pos = 0;
 	}
+
+
 	public void sort(E[] array){
 		this.array = array;
 		arrayLength = array.length;
-		pos = 0;
-		if(array[pos].compareTo(array[pos+1]) <= 0)
-			ascendingOrder();
-		else
-			descendindOrder();
 
+		while(true){
+			if(array[pos].compareTo(array[pos+1]) <= 0)
+				ascendingOrder();
+			else
+				descendindOrder();
 
-		//マージするメソッド
-		parallelMergeSort();
-
+			pos++;
+			if(endArray == true)
+				break;
+			else if(pos+1 > arrayLength-1){
+				works.offer(new MergeInfo(pos,pos));
+				break;
+			}
+		}
+		//修正、適宜実行できるようにする
 		try {
 			executor.invokeAll(workers);
-		} catch (InterruptedException e) {
+
+			//マージするメソッド
+			parallelMergeSort();
+
+			executor.invokeAll(workers);
+		}catch (InterruptedException e) {
 			// TODO 自動生成された catch ブロック
 			e.printStackTrace();
 		}
 		executor.shutdown();
+
 	}
 
 	//昇順メソッド
 	public void ascendingOrder(){
 		int first = pos;
-		while(array[pos].compareTo(array[pos+1]) < 0){
+		while(array[pos].compareTo(array[pos+1]) <= 0){
 			if(pos+1 >= arrayLength-1){
-				works.offer(new MergeInfo(first,pos,true));
+				works.offer(new MergeInfo(first,pos+1));
+				endArray = true;
 				return;
 			}
 			pos++;
 		}
-		works.offer(new MergeInfo(first,pos,false));
-		pos++;
-		descendindOrder();
+		works.offer(new MergeInfo(first,pos));
+		return;
 	}
 
 	//降順メソッド
 	public void descendindOrder(){
-
 		int first = pos;
-		if(pos+1 > arrayLength-1)
-			return;
 
-		//どこまで降順かチェック
-		while(array[pos].compareTo(array[pos+1]) >= 0){
-			pos++;
+		while(array[pos].compareTo(array[pos+1]) > 0){
 			if(pos+1 >= arrayLength-1){
-				pos++;
-				workers.add(Executors.callable(new QuickSortWorker(first,pos)));
-				works.offer(new MergeInfo(first,pos,true));
+				workers.add(Executors.callable(new QuickSortWorker(first,pos+1)));
+				works.offer(new MergeInfo(first,pos+1));
+				endArray = true;
 				return;
 			}
+			pos++;
 		}
-		if(first != pos){  //二個以上のデータ範囲のとき
-			workers.add(Executors.callable(new QuickSortWorker(first,pos)));
-		}
-		works.offer(new MergeInfo(first,pos,false));
-		
-		//昇順メソッドへ
-		ascendingOrder();  //test
+
+		workers.add(Executors.callable(new QuickSortWorker(first,pos)));//修正、もっと効率よくしたい
+		works.offer(new MergeInfo(first,pos));
+		return;
 	}
 
 	//マージする部分
 	public void parallelMergeSort(){
-		//二つのworksを取り出し、left,mid,rightを取り出す
-		//最後の一つだった場合
+		int workSize;
 		MergeInfo info1,info2;
 		while(true){
-			while(true){
+			workSize = works.size();
+			while(workSize > 1){
+				//二つのworksを取り出し、left,rightを取り出す
 				info1 = works.remove();
-				if(info1.end() == true)
-					break;
-
 				info2 = works.remove();
-				workers.add(Executors.callable(new MergeSortWorker(info1.left,info1.right,info2.left-1)));
 
-				if(info1.left == 0 && info2.right == arrayLength-1)  //修正、リストがからっ立ったら
-					return;
+				workers.add(Executors.callable(new MergeSortWorker(info1.left,info1.right,info2.right)));
+				works.offer(new MergeInfo(info1.left,info2.right));
 
-				works.offer(new MergeInfo(info1.left,info2.right,info2.end()));
-
-				if(info2.end() == true)
+				workSize = workSize-2;
+				//一つ余りが出たら後ろに回す
+				if(workSize == 1){
+					MergeInfo tmp = works.remove();
+					works.offer(tmp);
 					break;
+				}
 			}
+
 
 			try {
 				executor.invokeAll(workers);
@@ -113,13 +124,22 @@ public class NewSort <E extends Comparable> extends QuickSort<E>{
 				// TODO 自動生成された catch ブロック
 				e.printStackTrace();
 			}
+
+			if(works.size() == 2){  //範囲の情報が二つのときは最後にマージして終了
+				info1 = works.remove();
+				info2 = works.remove();
+				merge(info1.left,info1.right,info2.right,new LinkedList<E>());
+				break;
+			}else if(works.size() == 1)  //範囲の情報が一つのときは完成しているので終了
+				break;
 		}
 	}
 
-	public  void merge(int left,int mid,int right,LinkedList<E> buff){
+	public synchronized void merge(int left,int mid,int right,LinkedList<E> buff){
 		int i = left,j = mid + 1;
 
 		while(i <= mid && j <= right) {
+
 			if(array[i].compareTo(array[j]) < 0){
 				buff.add(array[i]); i++;
 			}else{
@@ -127,15 +147,16 @@ public class NewSort <E extends Comparable> extends QuickSort<E>{
 			}
 		}
 
-		while(i <= mid) { buff.add(array[i]); i++;}
-		while(j <= right) { buff.add(array[j]); j++;}
-		for(i = left;i <= right; i++){ array[i] = buff.remove(0);}
+
+		while(i <= mid) { buff.add(array[i]);i++;}
+		while(j <= right) { buff.add(array[j]);	j++;}
+		for(i = left;i <= right; i++){ array[i] = buff.poll();}
 	}
 
 
 	class MergeSortWorker implements Runnable{
-		int left,right,mid;
-		LinkedList<E> buff;
+		private int left,right,mid;
+		private LinkedList<E> buff;
 		public MergeSortWorker(int left,int right){
 			this.left = left;
 			this.right = right;
@@ -156,16 +177,11 @@ public class NewSort <E extends Comparable> extends QuickSort<E>{
 
 	class MergeInfo{
 		private int left,mid,right;
-		private boolean end;
-		MergeInfo(int left,int right,boolean end){
+		MergeInfo(int left,int right){
 			this.left = left;
 			this.right = right;
-			this.end = end;
 		}
 
-		public boolean end(){
-			return end;
-		}
 	}
 
 	class QuickSortWorker implements Runnable {
