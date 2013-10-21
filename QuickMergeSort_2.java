@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 
 import quickSort.QuickSort;
 import tools.MyArrayUtil;
@@ -20,7 +21,7 @@ public class QuickMergeSort_2<E extends Comparable> extends QuickSort<E> {
 	final ArrayList<Callable<Object>> workers;
 
 	public QuickMergeSort_2(){
-		threadsNum = Runtime.getRuntime().availableProcessors();
+		threadsNum = Runtime.getRuntime().availableProcessors()-1;
 		//threadsNum =2;
 		executor = Executors.newFixedThreadPool(threadsNum);
 		workers = new ArrayList<Callable<Object>>(threadsNum);
@@ -31,6 +32,7 @@ public class QuickMergeSort_2<E extends Comparable> extends QuickSort<E> {
 		this.array = array;
 		arrayLength = array.length;
 		sectionOfSort = array.length / threadsNum;
+
 		pivotOfEnd = 0; pos = 0;  pos2 = sectionOfSort - 1;
 
 		parallelQuickSort();
@@ -52,6 +54,8 @@ public class QuickMergeSort_2<E extends Comparable> extends QuickSort<E> {
 		pos = 0;pos2 = sectionOfSort * expansionSection - 1 ;
 		while(pos2 <= arrayLength - 1){
 			workers.clear();
+			threadsNum = threadsNum/2+1;
+			((ThreadPoolExecutor)executor).setCorePoolSize(threadsNum);
 
 			while(true){
 				workers.add(Executors.callable(new MergeSortWorker(pos,pos2)));
@@ -77,8 +81,12 @@ public class QuickMergeSort_2<E extends Comparable> extends QuickSort<E> {
 			}
 
 			expansionSection = expansionSection * 2;
+//			System.out.println("threadsNum : "+threadsNum);
+//			System.out.println(workers.size());
 			executor.invokeAll(workers);
 			pos = 0;pos2 = sectionOfSort * expansionSection - 1 ;
+
+			//System.out.println(((ThreadPoolExecutor)executor).getCorePoolSize());
 		}
 		executor.shutdown();
 		//最後のmerge
