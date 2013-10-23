@@ -14,7 +14,10 @@ import tools.MyArrayUtil;
 import tools.MyData;
 import tools.MyInteger;
 
-public class QuickMergeSort_2<E extends Comparable> extends QuickSort<E> {
+public class QuickMergeSort_2<E extends Comparable> implements Sort<E> {
+	protected E[] array;
+	private final int SMALL = 10;
+
 	ExecutorService executor;
 	int threadsNum, arrayLength, sectionOfSort, pivotOfEnd, pos, pos2;
 	int pivotOfRest = -1; //マージするときに余った部分の仕切り
@@ -68,7 +71,7 @@ public class QuickMergeSort_2<E extends Comparable> extends QuickSort<E> {
 
 				//余り部分の処理
 				if(pos2 > arrayLength-1){
-					if(cheakSameSort(arrayLength,pos,lastLenOfRestSection)) break;
+					if(isSameSort(arrayLength,pos,lastLenOfRestSection)) break;
 					if(pivotOfRest == -1)  //最初のあまり分のとき
 						workers.add(Executors.callable(new MergeSortWorker(pos,arrayLength - 1)));
 					else
@@ -116,7 +119,7 @@ public class QuickMergeSort_2<E extends Comparable> extends QuickSort<E> {
 	}
 
 	//前回同じ範囲でソートしたかcheak
-	public boolean cheakSameSort(int arrayLength,int pos,int lastLenOfRestSection){
+	public boolean isSameSort(int arrayLength,int pos,int lastLenOfRestSection){
 		if((arrayLength - pos) == lastLenOfRestSection)
 			return true;
 
@@ -173,11 +176,71 @@ public class QuickMergeSort_2<E extends Comparable> extends QuickSort<E> {
 		}
 	}
 
+	public int partition(int left,int right){
+		int i = left - 1, j = right;
+
+		E pivot  = array[right];
+		while(true){
+			do{
+
+				i++;
+			}while(array[i].compareTo(pivot) < 0);
+			do{
+				j--;
+				if(j < left) break;
+			}while(pivot.compareTo(array[j]) < 0);
+			if(i >= j) break;
+			swap(i,j);
+		}
+
+		swap(i,right);
+		return i;
+	}
+
+	public void swap(int i,int j){
+		E temp = array[i];
+		array[i] = array[j];
+		array[j] = temp;
+	}
+
+	public void insertSort(int left,int right){
+		int i,j;
+		E temp;
+		for(i = left + 1; i <=right;i++) {
+			temp = array[i];
+			j = i;
+			while(j > left && temp.compareTo(array[j-1])< 0){
+				array[j] = array[j-1];
+				j--;
+			}
+			array[j] = temp;
+		}
+	}
+
+	public void quickSort(int left,int right){
+		int i;
+		if(right <= left) return;
+
+		if(right <= left + SMALL)
+			insertSort(left,right);
+		else{
+
+			swap((left + right) / 2,right - 1);
+			if(array[right - 1].compareTo(array[left]) < -1)
+				swap(right-1,left);
+			if(array[right].compareTo(array[left]) < -1)
+				swap(right,left);
+			if(array[right].compareTo(array[right-1]) < -1)
+				swap(right,right);
+
+			i = partition(left,right);
+			quickSort(left, i - 1);
+			quickSort(i + 1 , right);
+		}
+	}
 
 
 
-	//	public  void quickSort(int left,int right){
-	//		super.quickSort(left, right);
-	//	}
+
 
 }
